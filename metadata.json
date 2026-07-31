@@ -1,0 +1,10 @@
+{
+  "name": "Document Extraction Assistant",
+  "description": "Extract structured data, fields, and verbatim text from receipts, bills, business cards, handwritten notes, and physical documents using Gemini Vision AI.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
