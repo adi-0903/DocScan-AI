@@ -564,17 +564,32 @@ app.get('/api/health', (req, res) => {
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {
     const distPath = path.resolve(process.cwd(), 'dist');
+    const assetsPath = path.join(distPath, 'assets');
 
-    // Serve static files from dist directory
-    app.use(express.static(distPath, { index: false }));
+    // 1. Serve compiled JavaScript & CSS bundle assets from /assets with long caching
+    app.use('/assets', express.static(assetsPath, {
+      immutable: true,
+      maxAge: '1y'
+    }));
 
-    // Asset route guard: prevents returning index.html (text/html) for missing JS/CSS assets
-    app.get(['/assets/*', '/*.js', '/*.css', '/*.svg', '/*.png', '/*.json'], (req, res) => {
+    // 2. Serve static root files (icons, manifest, sw.js)
+    app.use(express.static(distPath, {
+      index: false,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        }
+      }
+    }));
+
+    // 3. Asset route guard: returns 404 for missing asset hashes instead of HTML
+    app.get(['/assets/*', '/*.js', '/*.css'], (req, res) => {
       res.status(404).send('Asset not found');
     });
 
-    // SPA wildcard navigation route
+    // 4. SPA wildcard navigation route (NEVER CACHE index.html so clients get fresh build hashes)
     app.get('*', (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   } else {
