@@ -554,136 +554,193 @@ export default function App() {
           </div>
         )}
 
-        {/* Desktop Header Navigation Tabs (Hidden on mobile) */}
-        {currentUser && (
-          <div className="hidden md:flex bg-slate-200/80 dark:bg-slate-800/80 p-1 rounded-2xl max-w-xl mx-auto shadow-inner border border-transparent dark:border-slate-700/60">
-            <button
-              type="button"
-              onClick={() => setActiveTab('scan')}
-              className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'scan' || activeTab === 'result' || activeTab === 'history'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Scan className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Extractor Workspace
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('premium')}
-              className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'premium'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Crown className="w-3.5 h-3.5 text-amber-500" /> Premium Upgrades
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('profile')}
-              className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'profile'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <UserIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> My Profile &amp; Schema
-            </button>
-            {currentUser?.email?.toLowerCase() === 'singhaladitya611@gmail.com' && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('admin')}
-                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                  activeTab === 'admin'
-                    ? 'bg-amber-400 text-slate-950 font-extrabold shadow-xs'
-                    : 'text-amber-500 hover:text-amber-400'
-                }`}
-              >
-                <Shield className="w-3.5 h-3.5 text-amber-500" /> Master Admin Portal
-              </button>
-            )}
-          </div>
+        {/* Master Admin View (Dedicated ONLY to user management & plan activations) */}
+        {currentUser && currentUser.email.toLowerCase() === 'singhaladitya611@gmail.com' && (
+          <AdminDashboard
+            currentUser={currentUser}
+            onAdminSetUserPlan={handleAdminSetUserPlan}
+          />
         )}
 
-        {/* Dynamic View Sections */}
-        <AnimatePresence mode="wait">
-          {activeTab === 'admin' && (
-            <motion.div
-              key="view-admin"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.15 }}
-            >
-              <AdminDashboard
-                currentUser={currentUser}
-                onAdminSetUserPlan={handleAdminSetUserPlan}
-              />
-            </motion.div>
-          )}
-
-          {activeTab === 'premium' && (
-            <motion.div
-              key="view-premium"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.15 }}
-            >
-              <PremiumView
-                currentUser={currentUser}
-                onOpenAuth={handleOpenAuth}
-                onUpgradeUserPlan={handleUpgradeUserPlan}
-                onAdminSetUserPlan={handleAdminSetUserPlan}
-              />
-            </motion.div>
-          )}
-
-          {activeTab === 'profile' && (
-            <motion.div
-              key="view-profile"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.15 }}
-            >
-              <ProfilePage
-                currentUser={currentUser}
-                records={userRecords}
-                onOpenAuth={handleOpenAuth}
-                onLogout={handleLogout}
-                onClearHistory={handleClearAllRecords}
-                onNavigateToTab={(tab) => setActiveTab(tab)}
-                onUpgradeUserPlan={handleUpgradeUserPlan}
-                onSwitchUser={handleAuthSuccess}
-                onUpdateUser={(updated) => {
-                  setCurrentUser(updated);
-                  try {
-                    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updated));
-                  } catch (e) {
-                    console.warn(e);
-                  }
-                }}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Extractor Workspace Views (Scan / Result / History) */}
-        {(activeTab === 'scan' || activeTab === 'result' || activeTab === 'history') && (
+        {/* Normal User App Navigation & Views (Hidden for Master Admin) */}
+        {currentUser && currentUser.email.toLowerCase() !== 'singhaladitya611@gmail.com' && (
           <>
-            {/* Mobile View Switcher (Visible on mobile screens) */}
-            <div className="md:hidden">
-              <AnimatePresence mode="wait">
-                {activeTab === 'scan' && (
-                  <motion.div
-                    key="tab-scan"
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
-                    transition={{ duration: 0.15 }}
-                  >
+            {/* Desktop Header Navigation Tabs (Hidden on mobile) */}
+            <div className="hidden md:flex bg-slate-200/80 dark:bg-slate-800/80 p-1 rounded-2xl max-w-xl mx-auto shadow-inner border border-transparent dark:border-slate-700/60">
+              <button
+                type="button"
+                onClick={() => setActiveTab('scan')}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                  activeTab === 'scan' || activeTab === 'result' || activeTab === 'history'
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Scan className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Extractor Workspace
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('premium')}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                  activeTab === 'premium'
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-500" /> Premium Upgrades
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('profile')}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                  activeTab === 'profile'
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <UserIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> My Profile &amp; Schema
+              </button>
+            </div>
+
+            {/* Dynamic View Sections */}
+            <AnimatePresence mode="wait">
+              {activeTab === 'premium' && (
+                <motion.div
+                  key="view-premium"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <PremiumView
+                    currentUser={currentUser}
+                    onOpenAuth={handleOpenAuth}
+                    onUpgradeUserPlan={handleUpgradeUserPlan}
+                    onAdminSetUserPlan={handleAdminSetUserPlan}
+                  />
+                </motion.div>
+              )}
+
+              {activeTab === 'profile' && (
+                <motion.div
+                  key="view-profile"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <ProfilePage
+                    currentUser={currentUser}
+                    records={userRecords}
+                    onOpenAuth={handleOpenAuth}
+                    onLogout={handleLogout}
+                    onClearHistory={handleClearAllRecords}
+                    onNavigateToTab={(tab) => setActiveTab(tab)}
+                    onUpgradeUserPlan={handleUpgradeUserPlan}
+                    onSwitchUser={handleAuthSuccess}
+                    onUpdateUser={(updated) => {
+                      setCurrentUser(updated);
+                      try {
+                        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updated));
+                      } catch (e) {
+                        console.warn(e);
+                      }
+                    }}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Extractor Workspace Views (Scan / Result / History) */}
+            {(activeTab === 'scan' || activeTab === 'result' || activeTab === 'history') && (
+              <>
+                {/* Mobile View Switcher (Visible on mobile screens) */}
+                <div className="md:hidden">
+                  <AnimatePresence mode="wait">
+                    {activeTab === 'scan' && (
+                      <motion.div
+                        key="tab-scan"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 10 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <DocumentUploader
+                          onExtract={handleExtract}
+                          isLoading={isLoading}
+                          previewImage={previewImage}
+                          setPreviewImage={setPreviewImage}
+                          currentUser={currentUser}
+                          onOpenAuth={handleOpenAuth}
+                        />
+                      </motion.div>
+                    )}
+
+                    {activeTab === 'result' && (
+                      <motion.div
+                        key="tab-result"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 10 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        {extractedData ? (
+                          <ResultDisplay
+                            data={extractedData}
+                            imageUrl={previewImage || ''}
+                            onRefine={handleRefine}
+                            isRefining={isRefining}
+                            onUpdateData={handleUpdateDataManual}
+                            currentUser={currentUser}
+                            onNavigateToTab={(tab) => setActiveTab(tab)}
+                          />
+                        ) : (
+                          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 text-center flex flex-col items-center justify-center min-h-[300px]">
+                            <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-3 shadow-inner">
+                              <Sparkles className="w-6 h-6 animate-pulse" />
+                            </div>
+                            <h3 className="text-sm font-bold text-slate-800">
+                              No Active Scan Result
+                            </h3>
+                            <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
+                              Upload a photo or snap a document with your camera in the <strong>Scan</strong> tab to run Gemini field extraction.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab('scan')}
+                              className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-md active:scale-95 transition-all"
+                            >
+                              Go to Scan Tab
+                            </button>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+
+                    {activeTab === 'history' && (
+                      <motion.div
+                        key="tab-history"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 10 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <DocumentHistory
+                          records={userRecords}
+                          onSelectRecord={handleSelectRecord}
+                          onDeleteRecord={handleDeleteRecord}
+                          onClearAll={handleClearAllRecords}
+                          currentUser={currentUser}
+                          onToggleShareWithTeam={handleToggleShareWithTeam}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* Responsive Tablet/Desktop View (Visible on larger screens md+) */}
+                <div className="hidden md:grid md:grid-cols-12 gap-6 items-start">
+                  <div className="md:col-span-5 space-y-6">
                     <DocumentUploader
                       onExtract={handleExtract}
                       isLoading={isLoading}
@@ -692,17 +749,10 @@ export default function App() {
                       currentUser={currentUser}
                       onOpenAuth={handleOpenAuth}
                     />
-                  </motion.div>
-                )}
+                    <SchemaInfo />
+                  </div>
 
-                {activeTab === 'result' && (
-                  <motion.div
-                    key="tab-result"
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
-                    transition={{ duration: 0.15 }}
-                  >
+                  <div className="md:col-span-7 space-y-6">
                     {extractedData ? (
                       <ResultDisplay
                         data={extractedData}
@@ -714,36 +764,19 @@ export default function App() {
                         onNavigateToTab={(tab) => setActiveTab(tab)}
                       />
                     ) : (
-                      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 text-center flex flex-col items-center justify-center min-h-[300px]">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-3 shadow-inner">
-                          <Sparkles className="w-6 h-6 animate-pulse" />
+                      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 text-center flex flex-col items-center justify-center min-h-[350px]">
+                        <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-3 shadow-inner">
+                          <Sparkles className="w-7 h-7 animate-pulse text-indigo-600" />
                         </div>
-                        <h3 className="text-sm font-bold text-slate-800">
-                          No Active Scan Result
+                        <h3 className="text-base font-bold text-slate-800">
+                          Ready for Document Field Extraction
                         </h3>
-                        <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
-                          Upload a photo or snap a document with your camera in the <strong>Scan</strong> tab to run Gemini field extraction.
+                        <p className="text-xs text-slate-500 max-w-sm mt-1 leading-relaxed">
+                          Upload or snap a document photo on the left, then click <strong>Run Document Extraction</strong> to parse standard fields into JSON.
                         </p>
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab('scan')}
-                          className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-md active:scale-95 transition-all"
-                        >
-                          Go to Scan Tab
-                        </button>
                       </div>
                     )}
-                  </motion.div>
-                )}
 
-                {activeTab === 'history' && (
-                  <motion.div
-                    key="tab-history"
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
-                    transition={{ duration: 0.15 }}
-                  >
                     <DocumentHistory
                       records={userRecords}
                       onSelectRecord={handleSelectRecord}
@@ -752,154 +785,15 @@ export default function App() {
                       currentUser={currentUser}
                       onToggleShareWithTeam={handleToggleShareWithTeam}
                     />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Responsive Tablet/Desktop View (Visible on larger screens md+) */}
-            <div className="hidden md:grid md:grid-cols-12 gap-6 items-start">
-              <div className="md:col-span-5 space-y-6">
-                <DocumentUploader
-                  onExtract={handleExtract}
-                  isLoading={isLoading}
-                  previewImage={previewImage}
-                  setPreviewImage={setPreviewImage}
-                  currentUser={currentUser}
-                  onOpenAuth={handleOpenAuth}
-                />
-                <SchemaInfo />
-              </div>
-
-              <div className="md:col-span-7 space-y-6">
-                {extractedData ? (
-                  <ResultDisplay
-                    data={extractedData}
-                    imageUrl={previewImage || ''}
-                    onRefine={handleRefine}
-                    isRefining={isRefining}
-                    onUpdateData={handleUpdateDataManual}
-                    currentUser={currentUser}
-                    onNavigateToTab={(tab) => setActiveTab(tab)}
-                  />
-                ) : (
-                  <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-8 text-center flex flex-col items-center justify-center min-h-[380px]">
-                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-3 shadow-inner">
-                      <Sparkles className="w-7 h-7 animate-pulse" />
-                    </div>
-                    <h3 className="text-base font-bold text-slate-800">
-                      Ready for Document Field Extraction
-                    </h3>
-                    <p className="text-xs text-slate-500 max-w-sm mt-1 leading-relaxed">
-                      Upload or snap a document photo on the left, then click <strong>Run Document Extraction</strong> to parse standard fields into JSON.
-                    </p>
                   </div>
-                )}
-
-                <DocumentHistory
-                  records={userRecords}
-                  onSelectRecord={handleSelectRecord}
-                  onDeleteRecord={handleDeleteRecord}
-                  onClearAll={handleClearAllRecords}
-                  currentUser={currentUser}
-                  onToggleShareWithTeam={handleToggleShareWithTeam}
-                />
-              </div>
-            </div>
+                </div>
+              </>
+            )}
           </>
         )}
       </main>
 
-      {/* Mobile Fixed Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 shadow-lg px-2 py-1.5 flex items-center justify-around transition-colors">
-        <button
-          type="button"
-          onClick={() => setActiveTab('scan')}
-          className={`flex flex-col items-center justify-center w-14 py-1 rounded-xl transition-all ${
-            activeTab === 'scan'
-              ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50/80 dark:bg-indigo-950/80'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          <Camera className="w-4 h-4 mb-0.5" />
-          <span className="text-[10px]">Scan</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('result')}
-          className={`flex flex-col items-center justify-center w-14 py-1 rounded-xl relative transition-all ${
-            activeTab === 'result'
-              ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50/80 dark:bg-indigo-950/80'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          {extractedData && (
-            <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" />
-          )}
-          <Eye className="w-4 h-4 mb-0.5" />
-          <span className="text-[10px]">Result</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('history')}
-          className={`flex flex-col items-center justify-center w-14 py-1 rounded-xl relative transition-all ${
-            activeTab === 'history'
-              ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50/80 dark:bg-indigo-950/80'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          {userRecords.length > 0 && (
-            <span className="absolute top-0.5 right-1 bg-indigo-600 text-white text-[9px] font-bold px-1 rounded-full min-w-[14px]">
-              {userRecords.length}
-            </span>
-          )}
-          <Database className="w-4 h-4 mb-0.5" />
-          <span className="text-[10px]">Saved</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('premium')}
-          className={`flex flex-col items-center justify-center w-14 py-1 rounded-xl transition-all ${
-            activeTab === 'premium'
-              ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50/80 dark:bg-indigo-950/80'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          <Crown className="w-4 h-4 mb-0.5 text-amber-500" />
-          <span className="text-[10px]">Premium</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('profile')}
-          className={`flex flex-col items-center justify-center w-14 py-1 rounded-xl transition-all ${
-            activeTab === 'profile'
-              ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50/80 dark:bg-indigo-950/80'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          <UserIcon className="w-4 h-4 mb-0.5" />
-          <span className="text-[10px]">Profile</span>
-        </button>
-
-        {currentUser?.email?.toLowerCase() === 'singhaladitya611@gmail.com' && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('admin')}
-            className={`flex flex-col items-center justify-center w-14 py-1 rounded-xl transition-all ${
-              activeTab === 'admin'
-                ? 'text-amber-400 font-bold bg-amber-950/80'
-                : 'text-amber-500 hover:text-amber-400'
-            }`}
-          >
-            <Shield className="w-4 h-4 mb-0.5 text-amber-400" />
-            <span className="text-[10px] font-bold">Admin</span>
-          </button>
-        )}
-      </nav>
+      {/* Auth Modal Dialog */}
 
       {/* Auth Modal Dialog */}
       <AuthModal
