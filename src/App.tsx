@@ -214,6 +214,32 @@ export default function App() {
     }
   };
 
+  const handleAdminSetUserPlan = (userEmail: string, plan: 'free' | 'pro' | 'enterprise') => {
+    const USERS_STORAGE_KEY = 'doc_extractor_users_db_v1';
+    try {
+      const existing = localStorage.getItem(USERS_STORAGE_KEY);
+      if (existing) {
+        const usersMap = JSON.parse(existing);
+        const emailKey = userEmail.toLowerCase();
+        if (usersMap[emailKey]) {
+          usersMap[emailKey].user.plan = plan;
+          localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(usersMap));
+        }
+      }
+
+      if (currentUser && currentUser.email.toLowerCase() === userEmail.toLowerCase()) {
+        const updatedUser: User = { ...currentUser, plan };
+        setCurrentUser(updatedUser);
+        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
+      }
+
+      setAuthToast(`Admin set ${userEmail} to ${plan.toUpperCase()}`);
+      setTimeout(() => setAuthToast(null), 3000);
+    } catch (err) {
+      console.error('Failed to set user plan as admin:', err);
+    }
+  };
+
   const handleToggleShareWithTeam = (id: string) => {
     const updated = records.map((r) => {
       if (r.id === id) {
@@ -576,6 +602,7 @@ export default function App() {
                 currentUser={currentUser}
                 onOpenAuth={handleOpenAuth}
                 onUpgradeUserPlan={handleUpgradeUserPlan}
+                onAdminSetUserPlan={handleAdminSetUserPlan}
               />
             </motion.div>
           )}
