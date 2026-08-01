@@ -30,7 +30,7 @@ interface PremiumViewProps {
 const UPGRADE_REQUESTS_KEY = 'docscan_upgrade_requests_v1';
 const USERS_STORAGE_KEY = 'doc_extractor_users_db_v1';
 const ADMIN_PHONE_NUMBER = '+91 7009812679';
-const ADMIN_EMAIL = singhaladitya611@gmail.com';
+const ADMIN_EMAIL = 'singhaladitya611@gmail.com';
 
 export const PremiumView: React.FC<PremiumViewProps> = ({
   currentUser,
@@ -45,8 +45,9 @@ export const PremiumView: React.FC<PremiumViewProps> = ({
   const [contactModalPlan, setContactModalPlan] = useState<'pro' | 'enterprise' | null>(null);
   const [requestSubmitted, setRequestSubmitted] = useState<boolean>(false);
 
-  // Admin Mode State
-  const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
+  // Admin Mode State (Auto-enabled for singhaladitya611@gmail.com)
+  const isMasterAdmin = currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const [isAdminMode, setIsAdminMode] = useState<boolean>(isMasterAdmin);
   const [usersList, setUsersList] = useState<Array<{ user: User; passwordHash: string }>>([]);
   const [pendingRequests, setPendingRequests] = useState<Array<{ email: string; name: string; plan: string; timestamp: string }>>([]);
 
@@ -171,8 +172,8 @@ export const PremiumView: React.FC<PremiumViewProps> = ({
           type="button"
           onClick={() => setIsAdminMode(!isAdminMode)}
           className={`px-3 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${isAdminMode
-              ? 'bg-indigo-600 text-white shadow-xs'
-              : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:bg-slate-50'
+            ? 'bg-indigo-600 text-white shadow-xs'
+            : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:bg-slate-50'
             }`}
         >
           {isAdminMode ? 'Hide Admin Portal' : 'Open Admin Portal (Activate Users)'}
@@ -261,10 +262,10 @@ export const PremiumView: React.FC<PremiumViewProps> = ({
                         <strong className="text-white">{user.name}</strong>
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${user.plan === 'enterprise'
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                              : user.plan === 'pro'
-                                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                                : 'bg-slate-700 text-slate-300'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : user.plan === 'pro'
+                              ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                              : 'bg-slate-700 text-slate-300'
                             }`}
                         >
                           {user.plan || 'free'}
@@ -278,8 +279,8 @@ export const PremiumView: React.FC<PremiumViewProps> = ({
                         type="button"
                         onClick={() => handleAdminUpdatePlan(user.email, 'free')}
                         className={`px-2 py-1 rounded-lg text-[11px] font-semibold ${(user.plan || 'free') === 'free'
-                            ? 'bg-slate-700 text-slate-400 opacity-60'
-                            : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+                          ? 'bg-slate-700 text-slate-400 opacity-60'
+                          : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
                           }`}
                       >
                         Free
@@ -288,8 +289,8 @@ export const PremiumView: React.FC<PremiumViewProps> = ({
                         type="button"
                         onClick={() => handleAdminUpdatePlan(user.email, 'pro')}
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${user.plan === 'pro'
-                            ? 'bg-indigo-600 text-white font-black ring-2 ring-indigo-400'
-                            : 'bg-indigo-950 text-indigo-300 border border-indigo-700 hover:bg-indigo-900'
+                          ? 'bg-indigo-600 text-white font-black ring-2 ring-indigo-400'
+                          : 'bg-indigo-950 text-indigo-300 border border-indigo-700 hover:bg-indigo-900'
                           }`}
                       >
                         ⚡ PRO
@@ -298,8 +299,8 @@ export const PremiumView: React.FC<PremiumViewProps> = ({
                         type="button"
                         onClick={() => handleAdminUpdatePlan(user.email, 'enterprise')}
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${user.plan === 'enterprise'
-                            ? 'bg-amber-400 text-slate-950 font-black ring-2 ring-amber-300'
-                            : 'bg-amber-950 text-amber-300 border border-amber-700 hover:bg-amber-900'
+                          ? 'bg-amber-400 text-slate-950 font-black ring-2 ring-amber-300'
+                          : 'bg-amber-950 text-amber-300 border border-amber-700 hover:bg-amber-900'
                           }`}
                       >
                         👑 ENTERPRISE
@@ -331,8 +332,8 @@ export const PremiumView: React.FC<PremiumViewProps> = ({
             type="button"
             onClick={() => setSelectedBilling('monthly')}
             className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${selectedBilling === 'monthly'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
+              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
           >
             Monthly Billing
@@ -341,8 +342,8 @@ export const PremiumView: React.FC<PremiumViewProps> = ({
             type="button"
             onClick={() => setSelectedBilling('yearly')}
             className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1 ${selectedBilling === 'yearly'
-                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
+              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
           >
             Yearly Billing
