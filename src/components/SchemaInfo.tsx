@@ -7,13 +7,13 @@ export const SchemaInfo: React.FC = () => {
       {/* Header */}
       <div className="border-b border-slate-100 pb-4">
         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold mb-2">
-          <Sparkles className="w-3.5 h-3.5" /> Strict JSON Schema
+          <Sparkles className="w-3.5 h-3.5" /> Dynamic AI Vision Parsing
         </div>
         <h2 className="text-base font-bold text-slate-900">
-          Document Field Extraction Standard
+          Smart Adaptive Field Extraction Standard
         </h2>
         <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-          Powered by Gemini Vision AI with enforced structured output parsing. Dates, currency values, and contact properties are mapped directly to standard JSON data formats.
+          Powered by Gemini Vision AI with adaptive schema extraction. Only fields actually detected on your scanned document are displayed (no empty or null noise). Custom document attributes (e.g. Invoice #, ID Number, Policy #) are automatically extracted as dynamic properties.
         </p>
       </div>
 

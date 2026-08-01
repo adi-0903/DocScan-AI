@@ -55,6 +55,66 @@ export const PremiumView: React.FC<PremiumViewProps> = ({
         </div>
       )}
 
+      {/* Teammate Enterprise Managed Workspace Banner */}
+      {(currentUser?.isWorkspaceMember || currentUser?.workspaceOwnerEmail || currentUser?.plan === 'enterprise') && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl border border-indigo-500/40 shadow-xl space-y-3"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-indigo-600/80 text-white flex items-center justify-center border border-indigo-400/30 shrink-0 shadow-md">
+                <Building2 className="w-5 h-5 text-indigo-200" />
+              </div>
+              <div>
+                <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                  Enterprise Managed Workspace Active
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
+                    PROVISIONED
+                  </span>
+                </h3>
+                <p className="text-[11px] text-indigo-200">
+                  Full Enterprise plan capabilities enabled by your organization's workspace head.
+                </p>
+              </div>
+            </div>
+            <div className="text-[10px] uppercase font-bold tracking-wider px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 self-start sm:self-center">
+              ENTERPRISE PLAN MEMBER
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1 text-xs">
+            <div className="p-3 bg-white/5 rounded-xl border border-white/10 backdrop-blur-xs">
+              <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">
+                Working Under (Workspace Head)
+              </span>
+              <strong className="text-white text-xs block mt-1 truncate">
+                {currentUser.workspaceOwnerEmail || 'Workspace Owner (Head)'}
+              </strong>
+            </div>
+
+            <div className="p-3 bg-white/5 rounded-xl border border-white/10 backdrop-blur-xs">
+              <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">
+                Assigned Role &amp; Access
+              </span>
+              <strong className="text-amber-300 text-xs block mt-1 truncate">
+                {currentUser.workspaceRole || 'Accountant (Full View)'}
+              </strong>
+            </div>
+
+            <div className="p-3 bg-white/5 rounded-xl border border-white/10 backdrop-blur-xs">
+              <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">
+                Account Status
+              </span>
+              <strong className="text-emerald-400 text-xs block mt-1 truncate">
+                Auto-Generated Enterprise User
+              </strong>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Header Banner */}
       <div className="text-center space-y-2 max-w-lg mx-auto">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/10 to-indigo-500/10 border border-amber-500/20 text-amber-800 text-xs font-bold">
@@ -226,7 +286,7 @@ export const PremiumView: React.FC<PremiumViewProps> = ({
                 {selectedBilling === 'monthly' ? '$29.99' : '$23.99'}
                 <span className="text-xs font-normal text-slate-500">/mo</span>
               </div>
-              <p className="text-[11px] text-slate-500">For teams, accounting &amp; API access</p>
+              <p className="text-[11px] text-slate-500">For teams &amp; enterprise accounting</p>
             </div>
 
             <ul className="space-y-2 text-xs text-slate-600 pt-2 border-t border-slate-200">
@@ -240,7 +300,7 @@ export const PremiumView: React.FC<PremiumViewProps> = ({
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-indigo-600 shrink-0" />
-                <span>Custom Schema API Key Access</span>
+                <span>Custom Schema Management</span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-indigo-600 shrink-0" />

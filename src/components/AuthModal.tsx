@@ -190,6 +190,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {/* Form Content */}
           <div className="p-4 sm:p-5 space-y-4">
+            {/* Team Workspace Invited Tip */}
+            {mode === 'login' && (
+              <div className="p-3 bg-indigo-50/80 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800/60 rounded-xl text-[11px] text-indigo-900 dark:text-indigo-200 leading-relaxed">
+                <span className="font-bold block text-indigo-950 dark:text-indigo-100 mb-0.5">
+                  💡 Joined via Team Workspace Invitation?
+                </span>
+                Your Enterprise account was generated automatically! Use your email and assigned password (e.g. <code className="bg-indigo-100 dark:bg-indigo-900/80 px-1 py-0.5 rounded font-mono font-bold">DocScan#8492</code>) to log in.
+              </div>
+            )}
+
             {error && (
               <div className="p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800/80 rounded-xl text-xs text-red-700 dark:text-red-300 font-medium">
                 {error}

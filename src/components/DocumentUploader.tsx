@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Upload, Camera, Image as ImageIcon, Sparkles, AlertCircle, X, HelpCircle, Lock } from 'lucide-react';
+import { Upload, Camera, Image as ImageIcon, Sparkles, AlertCircle, X, HelpCircle, Lock, FileText, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { CameraModal } from './CameraModal';
 import { User } from '../types';
+import { convertPdfFirstPageToImage } from '../lib/pdfUtils';
 
 interface DocumentUploaderProps {
   onExtract: (image: string, hint?: string) => void;
@@ -26,6 +27,8 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [isConvertingPdf, setIsConvertingPdf] = useState<boolean>(false);
+  const [isPdfLoaded, setIsPdfLoaded] = useState<boolean>(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -34,14 +37,35 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     }
   };
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     setFileError(null);
-    if (!file.type.startsWith('image/')) {
-      setFileError('Please select a valid image file (PNG, JPG, WEBP, SVG).');
+    setIsPdfLoaded(false);
+
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+    if (!isImage && !isPdf) {
+      setFileError('Please select a valid image (PNG, JPG, WEBP, SVG) or PDF document.');
       return;
     }
-    if (file.size > 15 * 1024 * 1024) {
-      setFileError('Image size exceeds 15MB limit. Please upload a smaller image.');
+
+    if (file.size > 20 * 1024 * 1024) {
+      setFileError('File size exceeds 20MB limit. Please upload a smaller document or image.');
+      return;
+    }
+
+    if (isPdf) {
+      setIsConvertingPdf(true);
+      try {
+        const imageBase64 = await convertPdfFirstPageToImage(file);
+        setPreviewImage(imageBase64);
+        setIsPdfLoaded(true);
+      } catch (err: any) {
+        console.error('PDF conversion failed:', err);
+        setFileError(err?.message || 'Failed to render PDF first page into image format.');
+      } finally {
+        setIsConvertingPdf(false);
+      }
       return;
     }
 
@@ -152,7 +176,21 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       )}
 
       {/* Upload Zone / Image Preview */}
-      {previewImage ? (
+      {isConvertingPdf ? (
+        <div className="rounded-2xl border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/50 dark:bg-indigo-950/40 p-8 flex flex-col items-center justify-center text-center space-y-3 min-h-[220px]">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-inner">
+            <Loader2 className="w-6 h-6 animate-spin text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-indigo-950 dark:text-indigo-200">
+              Converting PDF Document...
+            </h3>
+            <p className="text-[11px] text-indigo-700 dark:text-indigo-300 mt-0.5">
+              Rendering Page 1 into high-resolution image for Gemini Vision pipeline
+            </p>
+          </div>
+        </div>
+      ) : previewImage ? (
         <div className="relative rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-slate-950 flex flex-col items-center justify-center p-3 min-h-[220px]">
           <button
             type="button"
@@ -211,7 +249,13 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
             )}
           </div>
 
-          <div className="mt-2.5 text-center">
+          <div className="mt-2.5 text-center flex flex-col items-center gap-1">
+            {isPdfLoaded && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-900/90 text-indigo-300 border border-indigo-700/80">
+                <FileText className="w-3 h-3 text-indigo-400" /> PDF Page 1 Converted
+              </span>
+            )}
+
             {isLoading ? (
               <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-cyan-300 bg-slate-900/90 px-3 py-1 rounded-full border border-cyan-500/40 shadow-sm animate-pulse">
                 <Sparkles className="w-3 h-3 text-cyan-400 animate-spin" />
@@ -240,17 +284,17 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept="image/*"
+            accept="image/*,.pdf,application/pdf"
             className="hidden"
           />
           <div className="w-11 h-11 rounded-2xl bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-2 shadow-inner">
             <ImageIcon className="w-5 h-5" />
           </div>
           <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">
-            Tap to upload photo or choose file
+            Tap to upload photo or PDF document
           </h3>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-            PNG, JPG, WEBP, SVG (Max 15MB)
+            PNG, JPG, WEBP, SVG, PDF (Max 20MB)
           </p>
         </div>
       )}

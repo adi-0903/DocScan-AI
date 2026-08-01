@@ -168,6 +168,23 @@ export default function App() {
     setCurrentUser(updatedUser);
     try {
       localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
+
+      // Also update in registered users DB so re-login retains the upgraded plan
+      const USERS_STORAGE_KEY = 'doc_extractor_users_db_v1';
+      const existing = localStorage.getItem(USERS_STORAGE_KEY);
+      if (existing) {
+        const usersMap = JSON.parse(existing);
+        const emailKey = currentUser.email.toLowerCase();
+        if (usersMap[emailKey]) {
+          usersMap[emailKey].user = updatedUser;
+        } else {
+          usersMap[emailKey] = {
+            user: updatedUser,
+            passwordHash: 'DocScan#8492'
+          };
+        }
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(usersMap));
+      }
     } catch (err) {
       console.error('Failed to save upgraded plan:', err);
     }
@@ -529,6 +546,15 @@ export default function App() {
                 onClearHistory={handleClearAllRecords}
                 onNavigateToTab={(tab) => setActiveTab(tab)}
                 onUpgradeUserPlan={handleUpgradeUserPlan}
+                onSwitchUser={handleAuthSuccess}
+                onUpdateUser={(updated) => {
+                  setCurrentUser(updated);
+                  try {
+                    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updated));
+                  } catch (e) {
+                    console.warn(e);
+                  }
+                }}
               />
             </motion.div>
           )}

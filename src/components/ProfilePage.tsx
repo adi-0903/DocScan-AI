@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, ExtractionRecord } from '../types';
 import { SchemaInfo } from './SchemaInfo';
 import {
@@ -28,6 +28,7 @@ import {
   ExternalLink,
   X,
   Check,
+  Eye,
   Shield
 } from 'lucide-react';
 
@@ -39,6 +40,8 @@ interface ProfilePageProps {
   onClearHistory: () => void;
   onNavigateToTab: (tab: 'scan' | 'result' | 'history' | 'premium' | 'profile') => void;
   onUpgradeUserPlan?: (plan: 'pro' | 'enterprise') => void;
+  onSwitchUser?: (user: User) => void;
+  onUpdateUser?: (user: User) => void;
 }
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({
@@ -48,24 +51,118 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   onLogout,
   onClearHistory,
   onNavigateToTab,
-  onUpgradeUserPlan
+  onUpgradeUserPlan,
+  onSwitchUser,
+  onUpdateUser
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'api' | 'team' | 'schema'>('profile');
+  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'team' | 'schema'>('profile');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-  // API Key State
-  const [apiKey, setApiKey] = useState<string>(() => {
-    return localStorage.getItem(`docscan_apikey_${currentUser?.id}`) || `docscan_live_sk_${Math.random().toString(36).substring(2, 12)}${Date.now().toString(36)}`;
-  });
-  const [copiedKey, setCopiedKey] = useState(false);
+  // Helper to load workspace team members from both dedicated storage and global users DB
+  const getOwnerEmail = (user: User | null): string => {
+    if (!user) return '';
+    return (user.workspaceOwnerEmail || user.email || '').toLowerCase().trim();
+  };
 
-  // Team Workspace State
-  const [teamMembers, setTeamMembers] = useState<Array<{ email: string; role: string; status: string; inviteLink?: string }>>([
-    { email: currentUser?.email || '', role: 'Workspace Head (Owner)', status: 'Active' }
-  ]);
+  const loadWorkspaceTeamMembers = (user: User | null) => {
+    if (!user) return [];
+    const ownerEmail = getOwnerEmail(user);
+    if (!ownerEmail) return [];
+
+    const membersMap: Record<string, { email: string; role: string; status: string; password?: string; inviteLink?: string }> = {};
+
+    membersMap[ownerEmail] = {
+      email: ownerEmail,
+      role: 'Workspace Head (Owner)',
+      status: 'Active (Owner)',
+      password: '••••••••'
+    };
+
+    try {
+      const saved = localStorage.getItem(`docscan_team_members_${ownerEmail}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((m) => {
+            if (m && m.email) {
+              const em = m.email.toLowerCase();
+              membersMap[em] = {
+                email: m.email,
+                role: m.role || 'Accountant',
+                status: m.status || 'Active (Account Created)',
+                password: m.password || 'DocScan#8492',
+                inviteLink: m.inviteLink
+              };
+            }
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load team members:', err);
+    }
+
+    try {
+      const USERS_STORAGE_KEY = 'doc_extractor_users_db_v1';
+      const usersRaw = localStorage.getItem(USERS_STORAGE_KEY);
+      if (usersRaw) {
+        const usersDb: Record<string, { user: User; passwordHash: string }> = JSON.parse(usersRaw);
+        Object.values(usersDb).forEach(({ user, passwordHash }) => {
+          if (!user || !user.email) return;
+          const uEmail = user.email.toLowerCase();
+          const uOwner = (user.workspaceOwnerEmail || '').toLowerCase();
+
+          if (uEmail === ownerEmail || uOwner === ownerEmail) {
+            if (!membersMap[uEmail]) {
+              const isOwner = uEmail === ownerEmail;
+              membersMap[uEmail] = {
+                email: user.email,
+                role: isOwner ? 'Workspace Head (Owner)' : (user.workspaceRole || 'Accountant'),
+                status: isOwner ? 'Active (Owner)' : 'Active (Account Created)',
+                password: user.tempPassword || passwordHash || 'DocScan#8492'
+              };
+            } else {
+              if (user.tempPassword || passwordHash) {
+                membersMap[uEmail].password = user.tempPassword || passwordHash;
+              }
+              if (user.workspaceRole) {
+                membersMap[uEmail].role = user.workspaceRole;
+              }
+            }
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to scan users DB for workspace members:', err);
+    }
+
+    return Object.values(membersMap);
+  };
+
+  // Team Workspace State with LocalStorage & DB persistence
+  const [teamMembers, setTeamMembers] = useState<Array<{
+    email: string;
+    role: string;
+    status: string;
+    password?: string;
+    inviteLink?: string;
+  }>>(() => loadWorkspaceTeamMembers(currentUser));
+
+  useEffect(() => {
+    if (currentUser) {
+      setTeamMembers(loadWorkspaceTeamMembers(currentUser));
+    }
+  }, [currentUser?.email, currentUser?.workspaceOwnerEmail]);
+
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'Accountant' | 'Auditor' | 'Editor' | 'Member'>('Accountant');
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+  const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
+
+  // Password Change State
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState<string | null>(null);
+  const [passwordChangeError, setPasswordChangeError] = useState<string | null>(null);
 
   // Workspace Document Visibility & Sharing Settings
   const [autoShareScans, setAutoShareScans] = useState(true);
@@ -73,14 +170,20 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [restrictDocumentDeletions, setRestrictDocumentDeletions] = useState(true);
   const [maskSensitiveNotes, setMaskSensitiveNotes] = useState(false);
 
+  // Check if current logged-in user is the Workspace Head (Owner)
+  const isWorkspaceOwner = !currentUser?.isWorkspaceMember && (!currentUser?.workspaceOwnerEmail || currentUser?.workspaceOwnerEmail.toLowerCase() === currentUser?.email.toLowerCase());
+
   // Invite Modal & Dispatch Preview State
   const [activeInviteModal, setActiveInviteModal] = useState<{
     email: string;
     role: string;
+    password: string;
     token: string;
     link: string;
+    teammateUser?: User;
   } | null>(null);
   const [copiedInviteLink, setCopiedInviteLink] = useState(false);
+  const [copiedCreds, setCopiedCreds] = useState(false);
 
   if (!currentUser) {
     return (
@@ -130,41 +233,114 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
   const userPlan = currentUser.plan || 'free';
 
-  const handleGenerateNewKey = () => {
-    const newKey = `docscan_live_sk_${Math.random().toString(36).substring(2, 12)}${Date.now().toString(36)}`;
-    setApiKey(newKey);
-    localStorage.setItem(`docscan_apikey_${currentUser.id}`, newKey);
-  };
-
-  const handleCopyKey = () => {
-    navigator.clipboard.writeText(apiKey);
-    setCopiedKey(true);
-    setTimeout(() => setCopiedKey(false), 2000);
-  };
-
   const handleInviteMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    const emailToInvite = inviteEmail.trim();
+    if (!isWorkspaceOwner) {
+      alert('Only the Workspace Head (Owner) has permission to invite new team members.');
+      return;
+    }
+    const emailToInvite = inviteEmail.trim().toLowerCase();
     if (!emailToInvite) return;
+
+    const ownerEmail = getOwnerEmail(currentUser);
+
+    // Auto upgrade owner plan to Enterprise if not already upgraded
+    if (currentUser.plan !== 'enterprise' && onUpgradeUserPlan) {
+      onUpgradeUserPlan('enterprise');
+    }
+
+    // Generate auto password
+    const random4 = Math.floor(1000 + Math.random() * 9000);
+    const tempPassword = `DocScan#${random4}`;
+
+    const roleTitle = inviteRole;
+    const fullRoleDescription = `${roleTitle} (${roleTitle === 'Accountant' ? 'Full View' : roleTitle === 'Auditor' ? 'Read-Only' : roleTitle === 'Editor' ? 'Scan & Edit' : 'Member'})`;
+
+    // Auto-Register Teammate in USERS_STORAGE_KEY
+    const USERS_STORAGE_KEY = 'doc_extractor_users_db_v1';
+    let usersMap: Record<string, { user: User; passwordHash: string }> = {};
+    try {
+      const existing = localStorage.getItem(USERS_STORAGE_KEY);
+      if (existing) {
+        usersMap = JSON.parse(existing);
+      }
+    } catch (err) {
+      console.warn('Error reading user db:', err);
+    }
+
+    const nameFromEmail = emailToInvite
+      .split('@')[0]
+      .replace(/[._-]/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+
+    const newTeammateUser: User = {
+      id: 'usr_team_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      name: nameFromEmail || 'Workspace Teammate',
+      email: emailToInvite,
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(emailToInvite)}`,
+      createdAt: new Date().toISOString(),
+      plan: 'enterprise',
+      workspaceOwnerEmail: ownerEmail,
+      workspaceRole: fullRoleDescription,
+      isWorkspaceMember: true,
+      tempPassword: tempPassword
+    };
+
+    usersMap[emailToInvite] = {
+      user: newTeammateUser,
+      passwordHash: tempPassword
+    };
+
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(usersMap));
 
     const token = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
     const link = `${window.location.origin}?invite_workspace=${encodeURIComponent(currentUser.name || 'Enterprise')}&email=${encodeURIComponent(emailToInvite)}&token=${token}`;
 
-    setTeamMembers(prev => [
-      ...prev,
-      { email: emailToInvite, role: inviteRole, status: 'Pending Invite', inviteLink: link }
-    ]);
+    const newMemberEntry = {
+      email: emailToInvite,
+      role: fullRoleDescription,
+      status: 'Active (Account Created)',
+      password: tempPassword,
+      inviteLink: link
+    };
+
+    const updatedList = [...teamMembers.filter((m) => m.email.toLowerCase() !== emailToInvite), newMemberEntry];
+    setTeamMembers(updatedList);
+    try {
+      localStorage.setItem(`docscan_team_members_${ownerEmail}`, JSON.stringify(updatedList));
+    } catch (err) {
+      console.warn('Error saving team members:', err);
+    }
+
+    // Trigger backend email dispatch notification
+    try {
+      fetch('/api/send-invite-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientEmail: emailToInvite,
+          tempPassword: tempPassword,
+          role: fullRoleDescription,
+          workspaceName: currentUser.name || 'Enterprise',
+          workspaceOwnerEmail: currentUser.email,
+          inviteLink: link
+        })
+      }).catch(err => console.warn('Email dispatch notice:', err));
+    } catch (err) {
+      console.warn('Email API call error:', err);
+    }
+
     setInviteEmail('');
+    setInviteSuccess(`Account generated for ${emailToInvite}! Password (${tempPassword}) sent & dispatched.`);
+    setTimeout(() => setInviteSuccess(null), 8000);
 
-    setInviteSuccess(`Invitation link generated for ${emailToInvite}! Copy and share the direct link below.`);
-    setTimeout(() => setInviteSuccess(null), 5000);
-
-    // Open direct invite link modal
     setActiveInviteModal({
       email: emailToInvite,
-      role: inviteRole,
+      role: fullRoleDescription,
+      password: tempPassword,
       token,
-      link
+      link,
+      teammateUser: newTeammateUser
     });
   };
 
@@ -174,15 +350,116 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     setTimeout(() => setCopiedInviteLink(false), 2500);
   };
 
+  const handleCopyCredentials = (email: string, pass: string, role: string) => {
+    const text = `DocScan Enterprise Workspace Credentials:\nEmail: ${email}\nPassword: ${pass}\nRole: ${role}\nSupervisor: ${currentUser.email}\nPlan: Enterprise Plan`;
+    navigator.clipboard.writeText(text);
+    setCopiedCreds(true);
+    setTimeout(() => setCopiedCreds(false), 2500);
+  };
+
+  const handleSwitchToTeammate = (emailToSwitch: string) => {
+    const USERS_STORAGE_KEY = 'doc_extractor_users_db_v1';
+    try {
+      const existing = localStorage.getItem(USERS_STORAGE_KEY);
+      if (existing) {
+        const usersMap = JSON.parse(existing);
+        const record = usersMap[emailToSwitch.toLowerCase()];
+        if (record && record.user && onSwitchUser) {
+          onSwitchUser(record.user);
+          if (activeInviteModal) setActiveInviteModal(null);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Error switching user', err);
+    }
+  };
+
   const handleSimulateJoin = (emailToActivate: string) => {
-    setTeamMembers(prev =>
-      prev.map(m => m.email === emailToActivate ? { ...m, status: 'Active (Joined)' } : m)
+    setTeamMembers((prev) =>
+      prev.map((m) => (m.email === emailToActivate ? { ...m, status: 'Active (Joined)' } : m))
     );
     if (activeInviteModal?.email === emailToActivate) {
       setActiveInviteModal(null);
     }
     setInviteSuccess(`Teammate ${emailToActivate} has accepted the invitation and joined the workspace!`);
     setTimeout(() => setInviteSuccess(null), 4000);
+  };
+
+  const handleRemoveMember = (emailToRemove: string) => {
+    if (!isWorkspaceOwner) {
+      alert('Only the Workspace Head (Owner) can revoke teammate access.');
+      return;
+    }
+    if (!confirm(`Are you sure you want to remove ${emailToRemove} from this Enterprise Workspace?`)) {
+      return;
+    }
+
+    const ownerEmail = getOwnerEmail(currentUser);
+    const updatedList = teamMembers.filter((m) => m.email.toLowerCase() !== emailToRemove.toLowerCase());
+    setTeamMembers(updatedList);
+    try {
+      localStorage.setItem(`docscan_team_members_${ownerEmail}`, JSON.stringify(updatedList));
+    } catch (err) {
+      console.warn('Error saving team members list:', err);
+    }
+
+    // Remove from USERS_STORAGE_KEY
+    const USERS_STORAGE_KEY = 'doc_extractor_users_db_v1';
+    try {
+      const existing = localStorage.getItem(USERS_STORAGE_KEY);
+      if (existing) {
+        const usersMap = JSON.parse(existing);
+        delete usersMap[emailToRemove.toLowerCase()];
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(usersMap));
+      }
+    } catch (err) {
+      console.warn('Error removing user from DB:', err);
+    }
+
+    setInviteSuccess(`Access revoked for ${emailToRemove}. User can no longer access this workspace.`);
+    setTimeout(() => setInviteSuccess(null), 5000);
+  };
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPasswordInput || newPasswordInput.length < 6) {
+      setPasswordChangeError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (newPasswordInput !== confirmPasswordInput) {
+      setPasswordChangeError('Passwords do not match.');
+      return;
+    }
+
+    const USERS_STORAGE_KEY = 'doc_extractor_users_db_v1';
+    try {
+      const existing = localStorage.getItem(USERS_STORAGE_KEY);
+      if (existing) {
+        const usersMap = JSON.parse(existing);
+        const emailKey = currentUser.email.toLowerCase();
+        if (usersMap[emailKey]) {
+          usersMap[emailKey].passwordHash = newPasswordInput;
+          usersMap[emailKey].user.tempPassword = newPasswordInput;
+          localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(usersMap));
+        }
+      }
+    } catch (err) {
+      console.warn('Failed updating password in users DB:', err);
+    }
+
+    // Update currentUser
+    const updated = { ...currentUser, tempPassword: newPasswordInput };
+    if (onUpdateUser) {
+      onUpdateUser(updated);
+    }
+    localStorage.setItem('doc_extractor_current_user_v1', JSON.stringify(updated));
+
+    setNewPasswordInput('');
+    setConfirmPasswordInput('');
+    setPasswordChangeError(null);
+    setPasswordChangeSuccess('Password updated successfully!');
+    setTimeout(() => setPasswordChangeSuccess(null), 4000);
   };
 
   return (
@@ -200,17 +477,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         >
           <UserIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Account
         </button>
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('api')}
-          className={`flex-1 min-w-[110px] py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-            activeSubTab === 'api'
-              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Key className="w-3.5 h-3.5 text-amber-500" /> API Access
-        </button>
+
         <button
           type="button"
           onClick={() => setActiveSubTab('team')}
@@ -348,6 +615,68 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               Account Management
             </h3>
 
+            {/* Enterprise Managed Workspace Teammate Card */}
+            {(currentUser.isWorkspaceMember || currentUser.workspaceOwnerEmail || currentUser.plan === 'enterprise') && (
+              <div className="p-4 bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-2xl border border-indigo-500/30 shadow-lg space-y-3">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-amber-300" />
+                    <span className="text-xs font-bold text-white">
+                      Enterprise Team Member Workspace
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                    ENTERPRISE PLAN
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+                    <span className="text-[10px] text-slate-400 block uppercase font-medium">
+                      Working Under (Workspace Head)
+                    </span>
+                    <strong className="text-white text-xs block mt-0.5 truncate">
+                      {currentUser.workspaceOwnerEmail || currentUser.email}
+                    </strong>
+                  </div>
+
+                  <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+                    <span className="text-[10px] text-slate-400 block uppercase font-medium">
+                      Assigned Workspace Role
+                    </span>
+                    <strong className="text-amber-300 text-xs block mt-0.5 truncate">
+                      {currentUser.workspaceRole || 'Workspace Owner (Head)'}
+                    </strong>
+                  </div>
+                </div>
+
+                {currentUser.tempPassword && (
+                  <div className="bg-white/5 p-2.5 rounded-xl border border-white/10 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block uppercase font-medium">
+                        Assigned Password
+                      </span>
+                      <strong className="text-indigo-200 text-xs font-mono">
+                        {currentUser.tempPassword}
+                      </strong>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentUser.tempPassword || '');
+                        setCopiedCreds(true);
+                        setTimeout(() => setCopiedCreds(false), 2000);
+                      }}
+                      className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold rounded-lg border border-white/15 transition-colors flex items-center gap-1"
+                    >
+                      {copiedCreds ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
+                      {copiedCreds ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <button
                 type="button"
@@ -411,6 +740,55 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
               </button>
+
+              {/* Password Change Card */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <Lock className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>Update Account Password</span>
+                </div>
+
+                {passwordChangeSuccess && (
+                  <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs font-medium flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                    <span>{passwordChangeSuccess}</span>
+                  </div>
+                )}
+
+                {passwordChangeError && (
+                  <div className="p-2.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-lg text-xs font-medium flex items-center gap-2">
+                    <X className="w-4 h-4 shrink-0 text-red-600" />
+                    <span>{passwordChangeError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleChangePassword} className="space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="password"
+                      required
+                      value={newPasswordInput}
+                      onChange={(e) => setNewPasswordInput(e.target.value)}
+                      placeholder="New password (min 6 chars)..."
+                      className="px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                    <input
+                      type="password"
+                      required
+                      value={confirmPasswordInput}
+                      onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                      placeholder="Confirm new password..."
+                      className="px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
+                  >
+                    <Lock className="w-3.5 h-3.5" /> Save New Password
+                  </button>
+                </form>
+              </div>
 
               {showClearConfirm ? (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2">
@@ -484,87 +862,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         </div>
       )}
 
-      {/* API Key Developer Access SubTab */}
-      {activeSubTab === 'api' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                <Key className="w-4 h-4 text-amber-500" /> Developer API Key Access
-              </h3>
-              <p className="text-xs text-slate-500">
-                Programmatically extract structured JSON from receipts &amp; invoices via cURL or SDKs.
-              </p>
-            </div>
-            <span className="text-[10px] font-bold px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-200">
-              {userPlan.toUpperCase()} API
-            </span>
-          </div>
 
-          {userPlan === 'free' ? (
-            <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl text-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-amber-100/80 text-amber-700 flex items-center justify-center mx-auto">
-                <Key className="w-6 h-6" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-900">
-                Developer API Access Requires Pro or Enterprise
-              </h4>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                You are currently on the <strong>Free Plan</strong> (25 web scans/mo). Upgrade to Pro or Enterprise to issue live secret API keys and integrate automatic receipt parsing into your custom backend systems.
-              </p>
-              <button
-                type="button"
-                onClick={() => onNavigateToTab('premium')}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all inline-flex items-center gap-1.5 mt-2"
-              >
-                <Crown className="w-4 h-4 text-amber-300" /> Upgrade Plan to Unlock API
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <label className="block text-xs font-bold text-slate-700">
-                Live Secret API Key
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={apiKey}
-                  className="flex-1 px-3 py-2 text-xs font-mono bg-slate-900 text-amber-300 rounded-xl border border-slate-800"
-                />
-                <button
-                  type="button"
-                  onClick={handleCopyKey}
-                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-1 transition-colors"
-                >
-                  {copiedKey ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiedKey ? 'Copied' : 'Copy Key'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleGenerateNewKey}
-                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
-                >
-                  Roll Key
-                </button>
-              </div>
-
-              <div className="bg-slate-950 p-3.5 rounded-xl text-slate-200 text-[11px] font-mono space-y-1.5 overflow-x-auto">
-                <div className="text-slate-500">// cURL API Request Example</div>
-                <div className="text-cyan-300">
-                  curl -X POST https://api.docscan.io/v1/extract \
-                </div>
-                <div className="text-slate-300 pl-4">
-                  -H "Authorization: Bearer {apiKey}" \
-                </div>
-                <div className="text-slate-300 pl-4">
-                  -F "file=@/path/to/invoice.jpg"
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Team Workspace SubTab */}
       {activeSubTab === 'team' && (
@@ -626,32 +924,46 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 </div>
               )}
 
-              <form onSubmit={handleInviteMember} className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="email"
-                  required
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="Enter teammate email address..."
-                  className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
-                />
-                <select
-                  value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as any)}
-                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 bg-white font-medium"
-                >
-                  <option value="Accountant">Accountant (Full View)</option>
-                  <option value="Auditor">Auditor (Read-Only)</option>
-                  <option value="Editor">Editor (Scan &amp; Edit)</option>
-                  <option value="Member">Team Member</option>
-                </select>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 transition-colors shrink-0 shadow-sm"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Invite Teammate
-                </button>
-              </form>
+              {!isWorkspaceOwner ? (
+                <div className="p-3.5 bg-amber-50/90 border border-amber-200/90 rounded-xl text-amber-900 text-xs flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 font-bold">
+                    <Shield className="w-4 h-4 text-amber-700" />
+                  </div>
+                  <div>
+                    <span className="font-bold block text-amber-950">Workspace Invite Permission Restricted</span>
+                    <p className="text-[11px] text-amber-800">
+                      Only the <strong>Workspace Head (Owner)</strong> ({currentUser.workspaceOwnerEmail || 'Workspace Head'}) has permission to invite new team members or issue credentials to this Enterprise workspace.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleInviteMember} className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="email"
+                    required
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="Enter teammate email address..."
+                    className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
+                  />
+                  <select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value as any)}
+                    className="px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 bg-white font-medium"
+                  >
+                    <option value="Accountant">Accountant (Full View)</option>
+                    <option value="Auditor">Auditor (Read-Only)</option>
+                    <option value="Editor">Editor (Scan &amp; Edit)</option>
+                    <option value="Member">Team Member</option>
+                  </select>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 transition-colors shrink-0 shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Invite Teammate
+                  </button>
+                </form>
+              )}
 
               {/* Shared Document Visibility & Permission Policies */}
               <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-4 space-y-3">
@@ -728,118 +1040,184 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </div>
 
               <div className="space-y-2">
-                <h4 className="text-xs font-bold text-slate-700">Current Workspace Members &amp; Roles</h4>
-                <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
-                  {teamMembers.map((m, idx) => (
-                    <div key={idx} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between text-xs bg-white gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 font-bold flex items-center justify-center text-xs shrink-0">
-                          {m.email.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-800">{m.email}</p>
-                          <div className="flex items-center gap-1.5 text-[10px]">
-                            <span className={m.status.includes('Active') ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>
-                              ● {m.status}
-                            </span>
+                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">Current Workspace Members &amp; Auto-Provisioned Accounts</h4>
+                <div className="border border-slate-200 dark:border-slate-800 rounded-xl divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden">
+                  {teamMembers.map((m, idx) => {
+                    const isOwner = m.email === currentUser.email;
+                    const pass = m.password || 'DocScan#8492';
+                    const isVisible = showPasswordMap[m.email];
+
+                    return (
+                      <div key={idx} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between text-xs bg-white dark:bg-slate-900 gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800 font-bold flex items-center justify-center text-xs shrink-0 shadow-2xs">
+                            {m.email.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-slate-800 dark:text-slate-100">{m.email}</p>
+                              {isOwner && (
+                                <span className="text-[9px] bg-indigo-100 dark:bg-indigo-900/80 text-indigo-800 dark:text-indigo-200 px-1.5 py-0.5 rounded font-bold">
+                                  YOU (HEAD)
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-[10px]">
+                              <span className={m.status.includes('Active') ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-amber-600 dark:text-amber-400 font-bold'}>
+                                ● {m.status}
+                              </span>
+                              {!isOwner && isWorkspaceOwner && (
+                                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-600 dark:text-slate-300 font-mono">
+                                  <span>Pass: {isVisible ? pass : '••••••••'}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowPasswordMap(prev => ({ ...prev, [m.email]: !prev[m.email] }))}
+                                    className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold border border-slate-200">
-                          {m.role}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+                          <span className="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold border border-slate-200 dark:border-slate-700">
+                            {m.role}
+                          </span>
 
-                        {m.status.includes('Pending') && (
-                          <div className="flex items-center gap-1">
-                            {m.inviteLink && (
+                          {!isOwner && isWorkspaceOwner && (
+                            <div className="flex items-center gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => handleCopyInviteLink(m.inviteLink!)}
-                                className="px-2 py-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors"
-                                title="Copy invitation URL to send via email/chat"
+                                onClick={() => handleCopyCredentials(m.email, pass, m.role)}
+                                className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors border border-slate-200/80 dark:border-slate-700"
+                                title="Copy email and password credentials"
                               >
-                                <Link className="w-3 h-3 text-indigo-600" /> Copy Link
+                                <Copy className="w-3 h-3 text-slate-500" /> Copy Pass
                               </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleSimulateJoin(m.email)}
-                              className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors"
-                              title="Test accepting invitation as this team member"
-                            >
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Confirm Join
-                            </button>
-                          </div>
-                        )}
+
+                              {onSwitchUser && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSwitchToTeammate(m.email)}
+                                  className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors shadow-2xs"
+                                  title="Sign in directly as this team member"
+                                >
+                                  <UserIcon className="w-3 h-3 text-indigo-200" /> Log In
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMember(m.email)}
+                                className="px-2.5 py-1 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/60 text-red-600 dark:text-red-300 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors border border-red-200 dark:border-red-900/50"
+                                title="Revoke workspace access for this member"
+                              >
+                                <Trash2 className="w-3 h-3 text-red-500" /> Revoke
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Invite Modal & Email Dispatch Preview Dialog */}
+              {/* Invite Modal & Account Auto-Generation Dialog */}
               {activeInviteModal && (
                 <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-                  <div className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-200 relative overflow-hidden">
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800 relative overflow-hidden text-slate-900 dark:text-white">
                     <button
                       type="button"
                       onClick={() => setActiveInviteModal(null)}
-                      className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                      className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                     >
                       <X className="w-4 h-4" />
                     </button>
 
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
-                        <Send className="w-5 h-5" />
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center shrink-0 shadow-sm">
+                        <CheckCircle2 className="w-5 h-5" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-slate-900">
-                          Workspace Invitation Link Ready!
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                          Account Provisioned &amp; Password Created!
+                          <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/80 dark:text-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                            ENTERPRISE
+                          </span>
                         </h3>
-                        <p className="text-xs text-slate-500">
-                          Copy and send this direct invitation link to <strong>{activeInviteModal.email}</strong> via email, Slack, or chat.
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Teammate <strong>{activeInviteModal.email}</strong> can now log in immediately with the auto-generated password below.
                         </p>
                       </div>
                     </div>
 
-                    {/* Invitation Card Preview */}
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5 text-xs text-slate-700 font-sans">
-                      <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[11px] text-slate-500">
-                        <div>
-                          <strong>Invitee:</strong> {activeInviteModal.email}<br />
-                          <strong>Assigned Role:</strong> <span className="font-semibold text-slate-800">{activeInviteModal.role}</span>
-                        </div>
-                        <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                          LINK CREATED
+                    {/* Auto Credentials Card Box */}
+                    <div className="bg-gradient-to-br from-slate-900 to-indigo-950 border border-indigo-500/30 rounded-xl p-4 space-y-3 text-white text-xs shadow-md">
+                      <div className="flex items-center justify-between border-b border-white/10 pb-2 text-[11px]">
+                        <span className="font-bold text-amber-300 uppercase tracking-wider">
+                          GENERATED USER CREDENTIALS
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">
+                          READY FOR LOG IN
                         </span>
                       </div>
-                      <div className="p-3 bg-white border border-slate-200 rounded-lg space-y-2 text-[11px] text-slate-600 leading-relaxed">
-                        <p>Hello,</p>
-                        <p>
-                          <strong>{currentUser.name}</strong> ({currentUser.email}) has invited you to join their DocScan Enterprise Workspace as <strong>{activeInviteModal.role}</strong>.
-                        </p>
-                        <p>
-                          You will be able to review all shared receipt &amp; invoice scans, export CSV line items, and collaborate on accounting data.
-                        </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="bg-white/5 p-2.5 rounded-lg border border-white/10">
+                          <span className="text-[10px] text-slate-400 block uppercase font-medium">
+                            Account Email
+                          </span>
+                          <strong className="text-white text-xs block mt-0.5 font-mono truncate">
+                            {activeInviteModal.email}
+                          </strong>
+                        </div>
+
+                        <div className="bg-white/5 p-2.5 rounded-lg border border-white/10">
+                          <span className="text-[10px] text-slate-400 block uppercase font-medium">
+                            Auto-Generated Password
+                          </span>
+                          <strong className="text-amber-300 text-xs block mt-0.5 font-mono">
+                            {activeInviteModal.password}
+                          </strong>
+                        </div>
+
+                        <div className="bg-white/5 p-2.5 rounded-lg border border-white/10">
+                          <span className="text-[10px] text-slate-400 block uppercase font-medium">
+                            Assigned Enterprise Role
+                          </span>
+                          <strong className="text-indigo-200 text-xs block mt-0.5">
+                            {activeInviteModal.role}
+                          </strong>
+                        </div>
+
+                        <div className="bg-white/5 p-2.5 rounded-lg border border-white/10">
+                          <span className="text-[10px] text-slate-400 block uppercase font-medium">
+                            Workspace Head (Owner)
+                          </span>
+                          <strong className="text-white text-xs block mt-0.5 truncate">
+                            {currentUser.email}
+                          </strong>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Direct Copyable Link & Mailto Launcher */}
+                    {/* Direct Copyable Link & Credentials Launcher */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <label className="block text-[11px] font-bold text-slate-700">
-                          Direct Invite Link
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                          Direct Workspace Invitation URL
                         </label>
                         <a
-                          href={`mailto:${activeInviteModal.email}?subject=${encodeURIComponent(`Invitation to join ${currentUser.name}'s DocScan Workspace`)}&body=${encodeURIComponent(`Hello,\n\nYou have been invited to join ${currentUser.name}'s DocScan Enterprise Workspace as ${activeInviteModal.role}.\n\nClick the link below to accept your invitation:\n${activeInviteModal.link}\n\nBest regards,\nDocScan Team`)}`}
+                          href={`mailto:${activeInviteModal.email}?subject=${encodeURIComponent(`Enterprise Workspace Access Credentials - ${currentUser.name}`)}&body=${encodeURIComponent(`Hello,\n\nYour account has been automatically provisioned for ${currentUser.name}'s DocScan Enterprise Workspace!\n\nEmail: ${activeInviteModal.email}\nPassword: ${activeInviteModal.password}\nRole: ${activeInviteModal.role}\nSupervisor: ${currentUser.email}\nPlan: Enterprise Plan\n\nDirect Link:\n${activeInviteModal.link}\n\nBest regards,\nDocScan Team`)}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 hover:underline"
+                          className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
                         >
-                          <ExternalLink className="w-3 h-3" /> Open in Email App (Gmail/Outlook)
+                          <ExternalLink className="w-3 h-3" /> Send Credentials via Email
                         </a>
                       </div>
                       <div className="flex items-center gap-2">
@@ -847,7 +1225,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           type="text"
                           readOnly
                           value={activeInviteModal.link}
-                          className="flex-1 px-3 py-2 text-xs font-mono bg-slate-100 border border-slate-200 rounded-xl text-slate-800"
+                          className="flex-1 px-3 py-2 text-xs font-mono bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200"
                         />
                         <button
                           type="button"
@@ -855,24 +1233,36 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-1 shrink-0 transition-colors"
                         >
                           {copiedInviteLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          {copiedInviteLink ? 'Copied Link!' : 'Copy Link'}
+                          {copiedInviteLink ? 'Copied!' : 'Copy Link'}
                         </button>
                       </div>
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                    <div className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                       <button
                         type="button"
-                        onClick={() => handleSimulateJoin(activeInviteModal.email)}
-                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5"
+                        onClick={() => handleCopyCredentials(activeInviteModal.email, activeInviteModal.password, activeInviteModal.role)}
+                        className="w-full sm:flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5"
                       >
-                        <CheckCircle2 className="w-4 h-4" /> Simulate Teammate Acceptance
+                        <Copy className="w-4 h-4 text-amber-300" />
+                        {copiedCreds ? 'Credentials Copied!' : 'Copy Full Credentials'}
                       </button>
+
+                      {onSwitchUser && (
+                        <button
+                          type="button"
+                          onClick={() => handleSwitchToTeammate(activeInviteModal.email)}
+                          className="w-full sm:flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5"
+                        >
+                          <UserIcon className="w-4 h-4 text-indigo-200" /> Sign In as Teammate Now
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => setActiveInviteModal(null)}
-                        className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors"
+                        className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition-colors"
                       >
                         Done
                       </button>
