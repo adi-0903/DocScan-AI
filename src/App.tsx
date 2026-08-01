@@ -6,15 +6,16 @@ import { DocumentHistory } from './components/DocumentHistory';
 import { SchemaInfo } from './components/SchemaInfo';
 import { ProfilePage } from './components/ProfilePage';
 import { PremiumView } from './components/PremiumView';
+import { AdminDashboard } from './components/AdminDashboard';
 import { AuthModal } from './components/AuthModal';
 import { ExtractedDocumentData, ExtractionRecord, User } from './types';
-import { Sparkles, AlertCircle, Camera, Eye, Database, ShieldCheck, UserCheck, Lock, LogIn, UserPlus, Crown, User as UserIcon, Scan, Server } from 'lucide-react';
+import { Sparkles, AlertCircle, Camera, Eye, Database, ShieldCheck, UserCheck, Lock, LogIn, UserPlus, Crown, User as UserIcon, Scan, Server, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const LOCAL_STORAGE_KEY = 'doc_extractor_history_v1';
 const CURRENT_USER_KEY = 'doc_extractor_current_user_v1';
 
-type MainTab = 'scan' | 'result' | 'history' | 'premium' | 'profile';
+type MainTab = 'scan' | 'result' | 'history' | 'premium' | 'profile' | 'admin';
 
 export default function App() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -167,7 +168,7 @@ export default function App() {
     setTimeout(() => setAuthToast(null), 3000);
 
     if (user.email.toLowerCase() === 'singhaladitya611@gmail.com') {
-      setActiveTab('premium');
+      setActiveTab('admin');
     }
   };
 
@@ -589,11 +590,39 @@ export default function App() {
             >
               <UserIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> My Profile &amp; Schema
             </button>
+            {currentUser?.email?.toLowerCase() === 'singhaladitya611@gmail.com' && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('admin')}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                  activeTab === 'admin'
+                    ? 'bg-amber-400 text-slate-950 font-extrabold shadow-xs'
+                    : 'text-amber-500 hover:text-amber-400'
+                }`}
+              >
+                <Shield className="w-3.5 h-3.5 text-amber-500" /> Master Admin Portal
+              </button>
+            )}
           </div>
         )}
 
         {/* Dynamic View Sections */}
         <AnimatePresence mode="wait">
+          {activeTab === 'admin' && (
+            <motion.div
+              key="view-admin"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+            >
+              <AdminDashboard
+                currentUser={currentUser}
+                onAdminSetUserPlan={handleAdminSetUserPlan}
+              />
+            </motion.div>
+          )}
+
           {activeTab === 'premium' && (
             <motion.div
               key="view-premium"
@@ -855,6 +884,21 @@ export default function App() {
           <UserIcon className="w-4 h-4 mb-0.5" />
           <span className="text-[10px]">Profile</span>
         </button>
+
+        {currentUser?.email?.toLowerCase() === 'singhaladitya611@gmail.com' && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('admin')}
+            className={`flex flex-col items-center justify-center w-14 py-1 rounded-xl transition-all ${
+              activeTab === 'admin'
+                ? 'text-amber-400 font-bold bg-amber-950/80'
+                : 'text-amber-500 hover:text-amber-400'
+            }`}
+          >
+            <Shield className="w-4 h-4 mb-0.5 text-amber-400" />
+            <span className="text-[10px] font-bold">Admin</span>
+          </button>
+        )}
       </nav>
 
       {/* Auth Modal Dialog */}

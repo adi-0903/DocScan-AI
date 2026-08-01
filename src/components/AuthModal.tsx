@@ -218,22 +218,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {/* Form Content */}
           <div className="p-4 sm:p-5 space-y-4">
-            {/* Quick Admin fill button */}
-            <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-xl flex items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <Crown className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                <span className="text-[11px] text-amber-900 dark:text-amber-200 font-semibold truncate">
-                  Master Admin Credentials Available
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleFillAdminCredentials}
-                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-[10px] rounded-lg shrink-0 transition-colors shadow-2xs"
-              >
-                Fill Admin Login
-              </button>
-            </div>
 
             {error && (
               <div className="p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800/80 rounded-xl text-xs text-red-700 dark:text-red-300 font-medium">

@@ -8,7 +8,7 @@ interface HeaderProps {
   currentUser: User | null;
   onOpenAuth: (mode?: 'login' | 'register') => void;
   onLogout: () => void;
-  onNavigateToTab?: (tab: 'scan' | 'result' | 'history' | 'premium' | 'profile') => void;
+  onNavigateToTab?: (tab: 'scan' | 'result' | 'history' | 'premium' | 'profile' | 'admin') => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
 }
@@ -123,10 +123,23 @@ export const Header: React.FC<HeaderProps> = ({
                             setShowDropdown(false);
                             onNavigateToTab('premium');
                           }}
-                          className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold text-amber-300 hover:bg-slate-800 flex items-center gap-1.5 transition-colors"
+                          className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold text-indigo-300 hover:bg-slate-800 flex items-center gap-1.5 transition-colors"
                         >
-                          <Crown className="w-3.5 h-3.5 text-amber-400" /> Premium Plans
+                          <Crown className="w-3.5 h-3.5 text-indigo-400" /> Premium Plans
                         </button>
+
+                        {currentUser.email.toLowerCase() === 'singhaladitya611@gmail.com' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowDropdown(false);
+                              onNavigateToTab('admin');
+                            }}
+                            className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-bold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 flex items-center gap-1.5 transition-colors border border-amber-500/30 my-1"
+                          >
+                            <Crown className="w-3.5 h-3.5 text-amber-400" /> Master Admin Portal
+                          </button>
+                        )}
                       </>
                     )}
                     <button
