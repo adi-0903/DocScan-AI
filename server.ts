@@ -5,7 +5,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import pg from 'pg';
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Middleware to parse large JSON payloads (base64 document images)
 app.use(express.json({ limit: '25mb' }));
