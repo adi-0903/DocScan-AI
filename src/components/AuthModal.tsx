@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User as UserIcon, Mail, Lock, Eye, EyeOff, LogIn, UserPlus, Sparkles, CheckCircle2, Scan } from 'lucide-react';
+import { X, User as UserIcon, Mail, Lock, Eye, EyeOff, LogIn, UserPlus, Sparkles, CheckCircle2, Scan, Crown, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from '../types';
 
@@ -11,6 +11,8 @@ interface AuthModalProps {
 }
 
 const USERS_STORAGE_KEY = 'doc_extractor_users_db_v1';
+const MASTER_ADMIN_EMAIL = 'singhaladitya611@gmail.com';
+const MASTER_ADMIN_PASSWORD = 'aditya@12355';
 
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
@@ -29,6 +31,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleFillAdminCredentials = () => {
+    setMode('login');
+    setEmail(MASTER_ADMIN_EMAIL);
+    setPassword(MASTER_ADMIN_PASSWORD);
+    setError(null);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +81,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           ? JSON.parse(existingUsersRaw)
           : {};
 
+        // Always seed/ensure Master Admin account exists
+        const adminKey = MASTER_ADMIN_EMAIL.toLowerCase();
+        if (!usersMap[adminKey] || usersMap[adminKey].passwordHash !== MASTER_ADMIN_PASSWORD) {
+          usersMap[adminKey] = {
+            user: {
+              id: 'usr_master_admin_001',
+              name: 'Aditya Singhal (Master Admin)',
+              email: MASTER_ADMIN_EMAIL,
+              plan: 'enterprise',
+              avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(MASTER_ADMIN_EMAIL)}`,
+              createdAt: new Date().toISOString(),
+              workspaceRole: 'Master Admin'
+            },
+            passwordHash: MASTER_ADMIN_PASSWORD
+          };
+          localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(usersMap));
+        }
+
         if (mode === 'register') {
           if (usersMap[trimmedEmail]) {
             setError('An account with this email address already exists. Please log in.');
@@ -84,7 +111,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             name: name.trim(),
             email: trimmedEmail,
             avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(trimmedEmail)}`,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            plan: 'free'
           };
 
           usersMap[trimmedEmail] = {
@@ -98,6 +126,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           onClose();
         } else {
           // Login mode
+          // Special Master Admin shortcut check
+          if (trimmedEmail === adminKey && trimmedPassword === MASTER_ADMIN_PASSWORD) {
+            setIsLoading(false);
+            onSuccess(usersMap[adminKey].user);
+            onClose();
+            return;
+          }
+
           const foundAccount = usersMap[trimmedEmail];
           if (!foundAccount || foundAccount.passwordHash !== trimmedPassword) {
             setError('Invalid email address or password.');
@@ -113,7 +149,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setError('An unexpected error occurred. Please try again.');
         setIsLoading(false);
       }
-    }, 400);
+    }, 300);
   };
 
   return (
@@ -148,57 +184,56 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </span>
                 </h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  {mode === 'login' ? 'Sign in to access saved documents' : 'Create an account to save & sync scans'}
+                  Sign in or register to scan, extract fields, &amp; save document history.
                 </p>
               </div>
             </div>
 
-            {/* Mode Switcher Pills */}
-            <div className="grid grid-cols-2 gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700/80 mt-4">
+            {/* Mode Switcher Tabs */}
+            <div className="flex bg-slate-800/90 p-1 rounded-xl border border-slate-700/80 mt-4">
               <button
                 type="button"
-                onClick={() => {
-                  setMode('login');
-                  setError(null);
-                  setConfirmPassword('');
-                }}
-                className={`py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                onClick={() => { setMode('login'); setError(null); }}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                   mode === 'login'
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <LogIn className="w-3.5 h-3.5" /> Log In
+                <LogIn className="w-3.5 h-3.5" /> Sign In
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setMode('register');
-                  setError(null);
-                  setConfirmPassword('');
-                }}
-                className={`py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                onClick={() => { setMode('register'); setError(null); }}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                   mode === 'register'
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <UserPlus className="w-3.5 h-3.5" /> Register
+                <UserPlus className="w-3.5 h-3.5" /> Create Account
               </button>
             </div>
           </div>
 
           {/* Form Content */}
           <div className="p-4 sm:p-5 space-y-4">
-            {/* Team Workspace Invited Tip */}
-            {mode === 'login' && (
-              <div className="p-3 bg-indigo-50/80 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800/60 rounded-xl text-[11px] text-indigo-900 dark:text-indigo-200 leading-relaxed">
-                <span className="font-bold block text-indigo-950 dark:text-indigo-100 mb-0.5">
-                  💡 Joined via Team Workspace Invitation?
+            {/* Quick Admin fill button */}
+            <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-xl flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Crown className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span className="text-[11px] text-amber-900 dark:text-amber-200 font-semibold truncate">
+                  Master Admin Credentials Available
                 </span>
-                Your Enterprise account was generated automatically! Use your email and assigned password (e.g. <code className="bg-indigo-100 dark:bg-indigo-900/80 px-1 py-0.5 rounded font-mono font-bold">DocScan#8492</code>) to log in.
               </div>
-            )}
+              <button
+                type="button"
+                onClick={handleFillAdminCredentials}
+                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-[10px] rounded-lg shrink-0 transition-colors shadow-2xs"
+              >
+                Fill Admin Login
+              </button>
+            </div>
 
             {error && (
               <div className="p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800/80 rounded-xl text-xs text-red-700 dark:text-red-300 font-medium">
@@ -218,7 +253,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Alex Johnson"
+                      placeholder="e.g. Aditya Singhal"
                       className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-colors"
                       required={mode === 'register'}
                     />
@@ -236,7 +271,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@company.com"
+                    placeholder="singhaladitya611@gmail.com"
                     className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-colors"
                     required
                   />
@@ -253,7 +288,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="aditya@12355"
                     className="w-full pl-9 pr-9 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-colors"
                     required
                   />
@@ -296,13 +331,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 min-h-[40px] mt-2"
+                className="w-full mt-2 py-2.5 px-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isLoading ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : mode === 'login' ? (
                   <>
-                    <LogIn className="w-4 h-4" /> Sign In
+                    <LogIn className="w-4 h-4" /> Sign In to Account
                   </>
                 ) : (
                   <>

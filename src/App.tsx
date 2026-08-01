@@ -165,6 +165,10 @@ export default function App() {
     loadUserDocuments(user.id);
     setAuthToast(`Welcome, ${user.name}!`);
     setTimeout(() => setAuthToast(null), 3000);
+
+    if (user.email.toLowerCase() === 'singhaladitya611@gmail.com') {
+      setActiveTab('premium');
+    }
   };
 
   const handleLogout = () => {
