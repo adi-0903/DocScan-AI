@@ -19,7 +19,8 @@ function getDbPool(): pg.Pool | null {
     try {
       dbPool = new pg.Pool({
         connectionString: dbUrl,
-        ssl: { rejectUnauthorized: false }
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 5000
       });
       console.log('PostgreSQL / Neon pool created.');
     } catch (err) {
@@ -554,26 +555,34 @@ app.post('/api/send-invite', async (req, res) => {
   }
 });
 
+// Health check endpoint for Render monitoring
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Start Express Server with Vite Dev or Static Production
 async function startServer() {
-  await initDbTables();
-
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa'
-    });
-    app.use(vite.middlewares);
-  } else {
+  if (process.env.NODE_ENV === 'production') {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
+  } else {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa'
+    });
+    app.use(vite.middlewares);
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Document Extraction Assistant server running on http://localhost:${PORT}`);
+    console.log(`Document Extraction Assistant server running on port ${PORT}`);
+  });
+
+  // Non-blocking database table verification
+  initDbTables().catch((err) => {
+    console.warn('Background database initialization warning:', err);
   });
 }
 
