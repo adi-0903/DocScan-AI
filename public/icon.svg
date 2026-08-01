@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f1f5f9" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Background rounded app box -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+
+  <g filter="url(#shadow)">
+    <!-- Document Sheet -->
+    <rect x="128" y="100" width="256" height="312" rx="24" fill="url(#cardGrad)" />
+    
+    <!-- Document header bar -->
+    <rect x="168" y="144" width="100" height="16" rx="8" fill="#6366f1" />
+    <rect x="168" y="176" width="176" height="12" rx="6" fill="#cbd5e1" />
+    <rect x="168" y="200" width="144" height="12" rx="6" fill="#cbd5e1" />
+    <rect x="168" y="224" width="160" height="12" rx="6" fill="#cbd5e1" />
+
+    <!-- Table preview lines -->
+    <rect x="168" y="260" width="176" height="40" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2" />
+    <rect x="180" y="274" width="60" height="12" rx="4" fill="#3b82f6" />
+    <rect x="260" y="274" width="68" height="12" rx="4" fill="#10b981" />
+
+    <!-- Scanner Beam -->
+    <line x1="96" y1="240" x2="416" y2="240" stroke="#00f0ff" stroke-width="8" stroke-linecap="round" />
+    <polygon points="96,240 416,240 380,280 132,280" fill="url(#bg)" opacity="0.25" />
+  </g>
+</svg>

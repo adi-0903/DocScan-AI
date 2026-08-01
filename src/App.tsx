@@ -38,6 +38,30 @@ export default function App() {
   // Theme state
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
+  // PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setShowInstallBanner(false);
+    }
+    setDeferredPrompt(null);
+  };
+
   // Load theme preference on mount
   useEffect(() => {
     try {
@@ -404,6 +428,32 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
       />
+
+      {/* PWA Mobile App Install Banner */}
+      {showInstallBanner && deferredPrompt && (
+        <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-4 py-2 flex items-center justify-between text-xs font-semibold shadow-md z-30">
+          <div className="flex items-center gap-2">
+            <Scan className="w-4 h-4 shrink-0" />
+            <span>Install DocScan AI app on your phone!</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleInstallApp}
+              className="bg-white text-indigo-700 px-3 py-1 rounded-lg font-bold shadow-xs text-[11px] hover:bg-slate-100 transition-colors"
+            >
+              Install App
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowInstallBanner(false)}
+              className="text-white/80 hover:text-white text-xs px-1"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Auth Notification Toast */}
       <AnimatePresence>

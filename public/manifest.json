@@ -1,0 +1,19 @@
+{
+  "short_name": "DocScan AI",
+  "name": "DocScan AI - Document Extraction Assistant",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any 192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "description": "Scan, extract structured fields, line items, and text from physical documents using Gemini AI."
+}
