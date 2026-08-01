@@ -563,8 +563,17 @@ app.get('/api/health', (req, res) => {
 // Start Express Server with Vite Dev or Static Production
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    const distPath = path.resolve(process.cwd(), 'dist');
+
+    // Serve static files from dist directory
+    app.use(express.static(distPath, { index: false }));
+
+    // Asset route guard: prevents returning index.html (text/html) for missing JS/CSS assets
+    app.get(['/assets/*', '/*.js', '/*.css', '/*.svg', '/*.png', '/*.json'], (req, res) => {
+      res.status(404).send('Asset not found');
+    });
+
+    // SPA wildcard navigation route
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
